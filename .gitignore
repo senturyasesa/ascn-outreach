@@ -1,0 +1,13 @@
+# личные данные пользователя
+data/*.session
+data/*.session-journal
+data/config.json
+data/leads.xlsx
+data/sent_log.csv
+data/proxies.json
+data/accounts.json
+data/sending.json
+# python
+__pycache__/
+*.pyc
+*.log

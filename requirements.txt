@@ -1,0 +1,4 @@
+flask
+telethon
+openpyxl
+python-socks[asyncio]
