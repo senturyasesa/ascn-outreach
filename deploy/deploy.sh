@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# ASCN Outreach — автоматическое развёртывание инфраструктуры.
+# Ставит venv+зависимости, создаёт папки/заготовки конфигов, регистрирует systemd-юниты.
+# ЧТО НЕ ДЕЛАЕТ (это твои данные — заполняешь сам): api-ключи, аккаунты, прокси, база, текст.
+set -euo pipefail
+
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$APP_DIR"
+echo "==> Каталог приложения: $APP_DIR"
+
+echo "==> Python venv + зависимости"
+python3 -m venv venv
+./venv/bin/pip install --quiet --upgrade pip
+./venv/bin/pip install --quiet -r requirements.txt
+./venv/bin/pip install --quiet opentele   # для добавления аккаунтов через tdata
+
+echo "==> Папки и заготовки конфигов (не перезаписываю существующие)"
+mkdir -p data backups
+[ -f .env ]                || cp .env.example .env
+[ -f data/config.json ]    || cp data/config.example.json data/config.json
+[ -f data/proxies.json ]   || cp data/proxies.example.json data/proxies.json
+[ -f data/rewrite.json ]   || cp data/rewrite.example.json data/rewrite.json
+[ -f data/broadcast.txt ]  || : > data/broadcast.txt
+[ -f data/accounts.json ]  || echo "[]" > data/accounts.json
+[ -f data/limits.json ]    || echo '{"default": 10}' > data/limits.json
+
+echo "==> Регистрация systemd-юнитов"
+for f in deploy/systemd/*.service deploy/systemd/*.timer; do
+  sed "s|__APP_DIR__|$APP_DIR|g" "$f" | sudo tee "/etc/systemd/system/$(basename "$f")" >/dev/null
+  echo "    установлен $(basename "$f")"
+done
+sudo systemctl daemon-reload
+
+cat <<MSG
+
+✅ Инфраструктура развёрнута.
+
+ДАЛЬШЕ — заполни СВОИ данные (это твои расходы/решения, автоматом не сделать):
+  1. data/config.json    — api_id / api_hash  (получить на my.telegram.org)
+  2. .env                — TG_BOT_TOKEN / TG_CHAT_ID  (бот у @BotFather + id группы)
+  3. data/proxies.json   — SOCKS5-прокси на аккаунт
+  4. data/leads.xlsx     — база лидов
+  5. data/broadcast.txt  — текст рассылки
+  6. АККАУНТЫ через tdata — см. ONBOARDING.md, раздел 2 (самое важное)
+
+Затем включи сервисы:
+  sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer
+
+Проверка:
+  systemctl status ascn-outreach
+  дашборд → http://<IP-сервера>:8765
+MSG

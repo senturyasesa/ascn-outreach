@@ -1,0 +1,13 @@
+[Unit]
+Description=ASCN Outreach — веб-дашборд
+After=network.target
+[Service]
+Type=simple
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=-__APP_DIR__/.env
+ExecStart=__APP_DIR__/venv/bin/python __APP_DIR__/app.py
+Restart=on-failure
+RestartSec=5
+MemoryMax=1200M
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=ASCN — демон дневной рассылки
+After=network.target
+[Service]
+Type=simple
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=-__APP_DIR__/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=__APP_DIR__/venv/bin/python daily_sender.py
+Restart=always
+RestartSec=10
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,7 @@
+[Unit]
+Description=ASCN — почасовой отчёт 09-21 МСК (06-18 UTC)
+[Timer]
+OnCalendar=*-*-* 06..18:00:00 UTC
+Persistent=false
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=ASCN — проверка ответов лидов
+After=network.target
+[Service]
+Type=oneshot
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=-__APP_DIR__/.env
+ExecStart=__APP_DIR__/venv/bin/python __APP_DIR__/notify_replies.py

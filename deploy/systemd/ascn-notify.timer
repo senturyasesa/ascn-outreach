@@ -1,0 +1,7 @@
+[Unit]
+Description=ASCN — запуск проверки ответов каждые 15 минут
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+[Install]
+WantedBy=timers.target
