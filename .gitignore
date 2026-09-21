@@ -1,13 +1,19 @@
-# личные данные пользователя
-data/*.session
-data/*.session-journal
-data/config.json
-data/leads.xlsx
-data/sent_log.csv
-data/proxies.json
-data/accounts.json
-data/sending.json
+# ── СЕКРЕТЫ И ДАННЫЕ ПОЛЬЗОВАТЕЛЯ — НЕ коммитить ──
+data/*
+!data/.gitkeep
+!data/*.example.json
+!data/leads.example.xlsx
+.env
+
+# бэкапы и логи
+backups/
+*.log
+*.session
+*.session-journal
+
 # python
 __pycache__/
 *.pyc
-*.log
+*.pyo
+.venv/
+venv/
