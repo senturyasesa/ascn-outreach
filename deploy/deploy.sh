@@ -8,6 +8,23 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$APP_DIR"
 echo "==> Каталог приложения: $APP_DIR"
 
+echo "==> Проверка/установка системных зависимостей"
+if command -v apt-get >/dev/null 2>&1; then
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq python3 python3-venv python3-pip git
+elif command -v dnf >/dev/null 2>&1; then
+  sudo dnf install -y -q python3 python3-pip git
+else
+  echo "    ⚠ не apt/dnf — поставь вручную: python3, python3-venv, python3-pip, git"
+fi
+
+PYV=$(python3 -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+echo "    Python $PYV"
+case "$PYV" in
+  3.9|3.10|3.11|3.12) : ;;
+  *) echo "    ⚠ Python $PYV: для добавления аккаунтов через tdata может понадобиться патч opentele (см. ONBOARDING.md 2.3)";;
+esac
+
 echo "==> Python venv + зависимости"
 python3 -m venv venv
 ./venv/bin/pip install --quiet --upgrade pip
@@ -49,4 +66,7 @@ cat <<MSG
 Проверка:
   systemctl status ascn-outreach
   дашборд → http://<IP-сервера>:8765
+
+  Если дашборд недоступен снаружи — открой порт:
+    sudo ufw allow 8765/tcp    (или проверь firewall провайдера)
 MSG
