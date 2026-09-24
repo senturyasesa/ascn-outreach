@@ -17,6 +17,7 @@ reply-rate = ответивших / отправлено. Малые числа 
 import os
 import csv
 import json
+import datetime
 from collections import defaultdict
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -24,7 +25,10 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 LOG = "data/sent_log.csv"
 REPLIES = "data/replies.json"
 BASES = "data/bases.json"
+FOLLOWUPS = "data/followups.json"
+FTEXT = "data/followups_text.json"
 OTHER = "прочее"   # ник не найден ни в одной базе (ручные отправки и т.п.)
+FU_DAY2, FU_DAY3 = 3, 7   # держать в синхроне с followup.py
 
 
 def _key(n):
@@ -122,6 +126,86 @@ def summary_text():
         for acc, s, rr, rate in pa:
             m += f"  · {acc}: {rate}% ({rr}/{s})\n"
     return m
+
+
+# ─────────────── фоллоапы: тексты и аналитика ───────────────
+def followups_text_load():
+    try:
+        return json.load(open(FTEXT, encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def followups_text_save(d):
+    json.dump(d, open(FTEXT, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+
+
+def followup_bases():
+    """Базы для редактора текстов: из bases.json + 'default'."""
+    order, _ = _load_bases()
+    return order + ["default"]
+
+
+def _followups_state():
+    try:
+        return json.load(open(FOLLOWUPS, encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _first_ts():
+    firsts = {}
+    if os.path.exists(LOG):
+        for r in csv.DictReader(open(LOG, encoding="utf-8-sig")):
+            n = r.get("ник")
+            if r.get("статус") == "ok" and n and n not in firsts:
+                firsts[n] = r.get("время", "")
+    return firsts
+
+
+def _age(ts):
+    try:
+        dt = datetime.datetime.strptime(str(ts)[:16], "%Y-%m-%d %H:%M")
+        return (datetime.datetime.utcnow() - dt).days
+    except Exception:
+        return -1
+
+
+def followup_overview():
+    """[(база, первое, ответили, ждут_добивки, касание2, касание3, ответили_после)] по объёму."""
+    order, m = _load_bases()
+    firsts = _first_ts()
+    reps = set(_key(k) for k in _load_replies())
+    state = _followups_state()
+
+    blank = lambda: {"first": 0, "replied": 0, "due": 0, "s2": 0, "s3": 0, "after": 0}
+    agg = defaultdict(blank)
+    for nick, ts in firsts.items():
+        base = m.get(_key(nick), OTHER)
+        a = agg[base]
+        a["first"] += 1
+        replied = _key(nick) in reps
+        if replied:
+            a["replied"] += 1
+        stg = state.get(nick, {}).get("stage", 0)
+        if stg >= 2:
+            a["s2"] += 1
+            if replied:
+                a["after"] += 1
+        if stg >= 3:
+            a["s3"] += 1
+        if (not replied) and stg < 3 and _age(ts) >= FU_DAY2:
+            a["due"] += 1
+
+    names = order + [OTHER]
+    out = []
+    for n in names:
+        a = agg.get(n)
+        if not a or a["first"] == 0:
+            continue
+        out.append((n, a["first"], a["replied"], a["due"], a["s2"], a["s3"], a["after"]))
+    out.sort(key=lambda x: -x[1])
+    return out
 
 
 if __name__ == "__main__":

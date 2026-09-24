@@ -28,7 +28,7 @@ import tg
 from errors_map import cell_text, is_permanent
 import vault as V
 import spambot
-from ui import INBOX_TPL, DIALOG_TPL, MAIN_TPL, SETTINGS_TPL, ONBOARD_TPL, CODE_TPL, UNLOCK_TPL, STATS_TPL
+from ui import INBOX_TPL, DIALOG_TPL, MAIN_TPL, SETTINGS_TPL, ONBOARD_TPL, CODE_TPL, UNLOCK_TPL, STATS_TPL, FOLLOWUPS_TPL
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -488,6 +488,33 @@ def edit():
 @app.route("/accounts")
 def accounts():
     return redirect(url_for("settings"))
+
+
+@app.route("/followups")
+def followups_page():
+    """Вкладка «Фоллоапы»: тексты добивок по базам + аналитика."""
+    import stats as S
+    return render_template_string(FOLLOWUPS_TPL, rows=S.followup_overview(),
+                                  texts=S.followups_text_load(), bases=S.followup_bases(),
+                                  day2=3, day3=7)
+
+
+@app.route("/followups/save", methods=["POST"])
+def followups_save():
+    import stats as S
+    bases = (request.form.get("bases", "") or "").split("|")
+    d = S.followups_text_load()
+    for i, b in enumerate(bases):
+        if not b:
+            continue
+        t2 = (request.form.get(f"t_{i}_2", "") or "").strip()
+        t3 = (request.form.get(f"t_{i}_3", "") or "").strip()
+        cur = d.get(b, {})
+        cur["2"], cur["3"] = t2, t3
+        d[b] = cur
+    S.followups_text_save(d)
+    flash("Тексты фоллоапов сохранены")
+    return redirect(url_for("followups_page"))
 
 
 @app.route("/stats")

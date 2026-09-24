@@ -224,6 +224,7 @@ MAIN_TPL = _page("ASCN Outreach", """
   <div class="brand"><b>ASCN</b> Outreach</div>
   <a class="top-link" href="/inbox">💬 Ответы</a>
   <a class="top-link" href="/stats">📈 Статистика</a>
+  <a class="top-link" href="/followups">🔁 Фоллоапы</a>
   <a class="top-link" href="/settings">⚙ Настройки</a>
 </header>
 
@@ -810,4 +811,57 @@ STATS_TPL = _page("Статистика · ASCN Outreach", """
   </table>
   {% else %}<div class="empty">Пока нет данных.</div>{% endif %}
 </div>
+""")
+
+
+FOLLOWUPS_TPL = _page("Фоллоапы · ASCN Outreach", """
+<div class="topbar">
+  <a class="top-link" href="/">← К рассылке</a>
+  <a class="top-link" href="/stats">📈 Статистика</a>
+</div>
+<h1 class="page">🔁 Фоллоапы</h1>
+<div class="hint" style="margin:-6px 0 14px">
+  Лид не ответил {{ day2 }} дн → касание №2, {{ day3 }} дн → касание №3. Тексты свои под каждую
+  базу (пусто = берётся «default»). Шлётся автоматически раз в день с того же аккаунта.
+</div>
+
+<div class="card">
+  <h3 style="margin:2px 0 10px">Что происходит</h3>
+  {% if rows %}
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:14px;min-width:520px">
+    <tr class="hint"><th align="left">База</th><th align="right">Первое</th><th align="right">Ответили</th>
+      <th align="right">Ждут добивки</th><th align="right">№2</th><th align="right">№3</th>
+      <th align="right">Ответ после добивки</th></tr>
+    {% for name,first,rep,due,s2,s3,after in rows %}
+    <tr style="border-top:1px solid var(--color-border)">
+      <td style="padding:8px 0">{{ name }}</td>
+      <td align="right">{{ first }}</td><td align="right">{{ rep }}</td>
+      <td align="right"><b>{{ due }}</b></td><td align="right">{{ s2 }}</td><td align="right">{{ s3 }}</td>
+      <td align="right"><b style="color:var(--color-accent)">{{ after }}</b></td></tr>
+    {% endfor %}
+  </table>
+  </div>
+  <div class="hint" style="margin:10px 0 0">«Ждут добивки» уйдут в ближайшие прогоны (есть дневной кап).
+    «Ответ после добивки» = добивка сработала, лид ответил.</div>
+  {% else %}<div class="empty">Пока нет данных.</div>{% endif %}
+</div>
+
+<form method="post" action="/followups/save">
+  <input type="hidden" name="bases" value="{{ bases|join('|') }}">
+  {% for b in bases %}
+  <div class="card">
+    <h3 style="margin:2px 0 10px">Тексты: {{ b }}</h3>
+    <label class="field">Касание №2 (через {{ day2 }} дн)</label>
+    <textarea name="t_{{ loop.index0 }}_2" rows="3" style="width:100%;box-sizing:border-box;
+      font-family:inherit;font-size:inherit;padding:9px;resize:vertical"
+      placeholder="{% if b != 'default' %}пусто = возьмётся из default{% else %}текст касания №2{% endif %}">{{ texts.get(b,{}).get('2','') }}</textarea>
+    <label class="field" style="margin-top:10px;display:block">Касание №3 (через {{ day3 }} дн)</label>
+    <textarea name="t_{{ loop.index0 }}_3" rows="3" style="width:100%;box-sizing:border-box;
+      font-family:inherit;font-size:inherit;padding:9px;resize:vertical"
+      placeholder="{% if b != 'default' %}пусто = возьмётся из default{% else %}текст касания №3{% endif %}">{{ texts.get(b,{}).get('3','') }}</textarea>
+  </div>
+  {% endfor %}
+  <button class="btn" type="submit">Сохранить тексты</button>
+</form>
 """)
