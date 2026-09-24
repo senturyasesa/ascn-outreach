@@ -11,7 +11,10 @@ api-ключи, прокси, база, текст) заполняются вр�
   `python3-venv`, `pip`, `git`. На других дистрибутивах поставь их вручную.
 - Python 3.9–3.12 (на 3.13 для аккаунтов может понадобиться патч opentele).
 - Доступ `sudo` (для регистрации systemd-юнитов).
-- Открытый порт **8765** для дашборда (`sudo ufw allow 8765/tcp` или firewall провайдера).
+- Порт **8765** для дашборда. ⚠️ Дашборд не имеет полноценной авторизации, поэтому
+  НЕ открывай порт всему интернету. Ограничь его своим IP:
+  `sudo ufw allow 22/tcp && sudo ufw allow from <ТВОЙ_IP> to any port 8765 proto tcp && sudo ufw --force enable`
+  (SSH на 22 разреши ПЕРВЫМ, иначе потеряешь доступ). Свой текущий IP на сервере: `echo $SSH_CLIENT`.
 
 ## Быстрый старт
 
@@ -54,7 +57,7 @@ sudo ./deploy/deploy.sh
 После заполнения данных:
 
 ```bash
-sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer ascn-bot
+sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer ascn-bot ascn-followup.timer
 ```
 
 | Сервис | Что делает |
@@ -64,6 +67,7 @@ sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-repo
 | `ascn-notify.timer` | проверка ответов каждые 15 мин |
 | `ascn-report.timer` | почасовые отчёты в бота (09-21 МСК) |
 | `ascn-bot` | слушатель кнопок черновиков ИИ-продажника в боте |
+| `ascn-followup.timer` | авто-фоллоапы неответившим лидам (раз в день) |
 
 Дашборд: `http://<IP-сервера>:8765`
 

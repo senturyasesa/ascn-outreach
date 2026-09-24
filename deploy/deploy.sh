@@ -64,7 +64,7 @@ cat <<MSG
                            (образцы: *.example.txt / *.example.md; ключ OpenRouter из rewrite.json)
 
 Затем включи сервисы:
-  sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer ascn-bot
+  sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer ascn-bot ascn-followup.timer
 
 Проверка:
   systemctl status ascn-outreach
