@@ -73,13 +73,14 @@ def main():
         key = info.get("когда", "") + "|" + (info.get("текст", "")[:50])
         if notified.get(nick) == key:
             continue                       # про этот ответ уже слали
-        link = "https://t.me/" + nick.lstrip("@")
-        site = "http://80.71.226.72:8765/inbox/" + nick.lstrip("@")
-        txt = (f"💬 Ответил лид!\n{nick}\n📱 Отвечать с: {info.get('аккаунт','')}\n\n"
-               f"{info.get('текст','')}\n\n💬 Ответить на сайте: {site}\n{link}")
-        if _send(txt):
+        try:
+            import bot_kb
+            bot_kb.push_draft(nick, info.get("аккаунт", ""),
+                              info.get("текст", ""), info.get("когда", ""))
             notified[nick] = key
             new += 1
+        except Exception as e:
+            print("push_draft error:", e)
     json.dump(notified, open(NOTIFIED, "w", encoding="utf-8"),
               ensure_ascii=False, indent=2)
     print(f"новых уведомлений отправлено: {new}")

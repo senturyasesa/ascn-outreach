@@ -11,6 +11,7 @@ import urllib.request
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import daily_sender as D
+import stats
 
 BOT = os.environ.get("TG_BOT_TOKEN", "")
 CHAT = os.environ.get("TG_CHAT_ID", "")
@@ -74,6 +75,11 @@ def main():
         for nick, v in list(replies.items())[-5:]:
             txt = (v.get("текст", "") if isinstance(v, dict) else str(v))[:60]
             m += f"  · {nick}: {txt}\n"
+
+    try:
+        m += stats.summary_text()
+    except Exception as e:
+        print("stats пропущены:", e)
 
     send(m)
     print("отчёт отправлен в Telegram")

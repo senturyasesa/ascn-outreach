@@ -223,6 +223,7 @@ MAIN_TPL = _page("ASCN Outreach", """
 <header>
   <div class="brand"><b>ASCN</b> Outreach</div>
   <a class="top-link" href="/inbox">💬 Ответы</a>
+  <a class="top-link" href="/stats">📈 Статистика</a>
   <a class="top-link" href="/settings">⚙ Настройки</a>
 </header>
 
@@ -749,14 +750,64 @@ DIALOG_TPL = _page("Диалог · ASCN Outreach", """
     {% endfor %}
   </div>
   {% endif %}
+  <form method="post" action="/inbox/ai_draft" style="margin:6px 0 0">
+    <input type="hidden" name="nick" value="{{ nick }}">
+    <input type="hidden" name="acc" value="{{ acc }}">
+    <button type="submit" style="background:#eef1f4;border:1px solid var(--color-border);border-radius:8px;padding:9px 14px;cursor:pointer;font-family:inherit;font-size:inherit">🤖 Черновик от ИИ</button>
+  </form>
   <form method="post" action="/inbox/send" style="display:flex;gap:8px;margin-top:14px;align-items:flex-start">
     <input type="hidden" name="nick" value="{{ nick }}">
     <input type="hidden" name="acc" value="{{ acc }}">
     <textarea name="text" placeholder="Написать ответ клиенту…" required rows="5"
               style="flex:1;box-sizing:border-box;resize:vertical;font-family:inherit;
-                     font-size:inherit;padding:10px;line-height:1.45" autofocus></textarea>
+                     font-size:inherit;padding:10px;line-height:1.45" autofocus>{{ draft or '' }}</textarea>
     <button class="btn" type="submit">Отправить</button>
   </form>
   <div class="hint" style="margin:10px 0 0">Уйдёт клиенту с аккаунта {{ acc }}. Обнови страницу, чтобы увидеть его ответ.</div>
+</div>
+""")
+
+
+STATS_TPL = _page("Статистика · ASCN Outreach", """
+<div class="topbar">
+  <a class="top-link" href="/">← К рассылке</a>
+  <a class="top-link" href="/inbox">💬 Ответы</a>
+</div>
+<h1 class="page">📈 Отклик (reply-rate)</h1>
+<div class="hint" style="margin:-6px 0 14px">
+  Отклик = ответивших / отправлено, за всё время. Малые числа — статистический шум,
+  смотри процент только рядом с объёмом (ответов/отправлено).
+</div>
+
+<div class="card">
+  <h3 style="margin:2px 0 10px">По базе</h3>
+  {% if camps %}
+  <table style="width:100%;border-collapse:collapse">
+    <tr class="hint"><th align="left">База</th><th align="right">Отправлено</th>
+      <th align="right">Ответов</th><th align="right">Отклик</th></tr>
+    {% for name,s,rr,rate in camps %}
+    <tr style="border-top:1px solid var(--color-border)">
+      <td style="padding:9px 0">{{ name }}</td>
+      <td align="right">{{ s }}</td><td align="right">{{ rr }}</td>
+      <td align="right"><b>{{ rate }}%</b></td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<div class="empty">Пока нет данных.</div>{% endif %}
+</div>
+
+<div class="card">
+  <h3 style="margin:2px 0 10px">По аккаунту</h3>
+  {% if accs %}
+  <table style="width:100%;border-collapse:collapse">
+    <tr class="hint"><th align="left">Аккаунт</th><th align="right">Отправлено</th>
+      <th align="right">Ответов</th><th align="right">Отклик</th></tr>
+    {% for acc,s,rr,rate in accs %}
+    <tr style="border-top:1px solid var(--color-border)">
+      <td style="padding:9px 0">{{ acc }}</td>
+      <td align="right">{{ s }}</td><td align="right">{{ rr }}</td>
+      <td align="right"><b>{{ rate }}%</b></td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<div class="empty">Пока нет данных.</div>{% endif %}
 </div>
 """)

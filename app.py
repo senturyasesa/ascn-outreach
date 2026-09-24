@@ -28,7 +28,7 @@ import tg
 from errors_map import cell_text, is_permanent
 import vault as V
 import spambot
-from ui import INBOX_TPL, DIALOG_TPL, MAIN_TPL, SETTINGS_TPL, ONBOARD_TPL, CODE_TPL, UNLOCK_TPL
+from ui import INBOX_TPL, DIALOG_TPL, MAIN_TPL, SETTINGS_TPL, ONBOARD_TPL, CODE_TPL, UNLOCK_TPL, STATS_TPL
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -490,6 +490,13 @@ def accounts():
     return redirect(url_for("settings"))
 
 
+@app.route("/stats")
+def stats_page():
+    """Вкладка «Статистика»: reply-rate по тексту и по аккаунтам."""
+    import stats as S
+    return render_template_string(STATS_TPL, camps=S.per_base(), accs=S.per_account())
+
+
 @app.route("/inbox")
 def inbox():
     """Вкладка «Ответы»: список ответивших лидов."""
@@ -508,7 +515,27 @@ def inbox_dialog(nick):
     acc = info.get("аккаунт", "")
     msgs, err = (tg.get_history(acc, nick) if acc else (None, "не знаю, с какого аккаунта писали"))
     return render_template_string(DIALOG_TPL, nick=nick, acc=acc,
-                                  msgs=msgs, err=err, info=info)
+                                  msgs=msgs, err=err, info=info, draft="")
+
+
+@app.route("/inbox/ai_draft", methods=["POST"])
+def inbox_ai_draft():
+    """Сгенерировать черновик ответа ИИ-продажником и подставить в поле."""
+    nick = request.form.get("nick", "").strip()
+    acc = request.form.get("acc", "").strip()
+    if not nick.startswith("@"):
+        nick = "@" + nick
+    import ai_sales
+    d, needs, aerr = ai_sales.draft(acc, nick)
+    if aerr:
+        flash("ИИ: " + aerr)
+    elif needs:
+        flash("⚠️ ИИ считает: тут лучше ответить лично (сложный/горячий лид). Черновик всё равно подставил.")
+    replies = C.load_replies()
+    info = replies.get(nick, {})
+    msgs, herr = (tg.get_history(acc, nick) if acc else (None, "не знаю, с какого аккаунта писали"))
+    return render_template_string(DIALOG_TPL, nick=nick, acc=acc,
+                                  msgs=msgs, err=herr, info=info, draft=d)
 
 
 @app.route("/inbox/send", methods=["POST"])

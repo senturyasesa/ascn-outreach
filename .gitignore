@@ -3,6 +3,8 @@ data/*
 !data/.gitkeep
 !data/*.example.json
 !data/leads.example.xlsx
+!data/*.example.txt
+!data/*.example.md
 .env
 
 # бэкапы и логи

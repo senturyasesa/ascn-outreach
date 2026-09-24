@@ -60,8 +60,11 @@ cat <<MSG
   5. data/broadcast.txt  — текст рассылки
   6. АККАУНТЫ через tdata — см. ONBOARDING.md, раздел 2 (самое важное)
 
+  7. data/ai_sales_prompt.txt + data/ai_sales_kb.md — промпт и база ИИ-продажника
+                           (образцы: *.example.txt / *.example.md; ключ OpenRouter из rewrite.json)
+
 Затем включи сервисы:
-  sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer
+  sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer ascn-bot
 
 Проверка:
   systemctl status ascn-outreach

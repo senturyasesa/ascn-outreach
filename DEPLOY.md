@@ -42,6 +42,7 @@ sudo ./deploy/deploy.sh
 | 4 | `data/leads.xlsx` | база лидов | образец `data/leads.example.xlsx` |
 | 5 | `data/broadcast.txt` | текст рассылки | пишешь сам |
 | 6 | **аккаунты** (`.session`) | авторизации Telegram | **через tdata — [ONBOARDING.md](ONBOARDING.md) раздел 2** |
+| 7 | `data/ai_sales_prompt.txt` + `ai_sales_kb.md` | ИИ-продажник: промпт и база | образцы `*.example.*`; ключ из `rewrite.json` |
 
 > Пункт 6 (аккаунты) — единственное, что остаётся ручной работой всегда:
 > Telegram не даёт логинить аккаунты по коду для рассылки, только через tdata.
@@ -53,7 +54,7 @@ sudo ./deploy/deploy.sh
 После заполнения данных:
 
 ```bash
-sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer
+sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer ascn-bot
 ```
 
 | Сервис | Что делает |
@@ -62,6 +63,7 @@ sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-repo
 | `ascn-daily` | демон дневной рассылки |
 | `ascn-notify.timer` | проверка ответов каждые 15 мин |
 | `ascn-report.timer` | почасовые отчёты в бота (09-21 МСК) |
+| `ascn-bot` | слушатель кнопок черновиков ИИ-продажника в боте |
 
 Дашборд: `http://<IP-сервера>:8765`
 
