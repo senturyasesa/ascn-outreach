@@ -84,6 +84,13 @@ def main():
     json.dump(notified, open(NOTIFIED, "w", encoding="utf-8"),
               ensure_ascii=False, indent=2)
     print(f"новых уведомлений отправлено: {new}")
+    try:
+        import reply_intel
+        tagged = reply_intel.classify_all()
+        if tagged:
+            print(f"классифицировано ответов: {tagged}")
+    except Exception as e:
+        print("classify error:", e)
 
 
 if __name__ == "__main__":

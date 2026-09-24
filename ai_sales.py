@@ -121,9 +121,99 @@ def draft(acc, nick):
     return out, needs, None
 
 
+_CLASSES = ("интерес", "отказ", "негатив", "бот", "другое")
+
+
+def classify_reply(text):
+    """Классифицировать ответ лида: интерес / отказ / негатив / бот / другое.
+    -> одно слово из _CLASSES (или 'другое' при ошибке)."""
+    text = (text or "").strip()
+    if not text:
+        return "другое"
+    cfg = _cfg()
+    if not cfg.get("key"):
+        return "другое"
+    sysmsg = (
+        "Ты классифицируешь ответ лида на холодную рассылку по автоматизации через ИИ. "
+        "Категории (верни РОВНО одно слово):\n"
+        "интерес — хочет узнать больше, спрашивает цену/как работает, готов на созвон, позитив;\n"
+        "отказ — не интересно, не актуально, вежливое нет;\n"
+        "негатив — грубость, агрессия, претензия «откуда мои контакты», мат;\n"
+        "бот — автоответчик, реклама в ответ, не по теме нашего продукта;\n"
+        "другое — непонятно/нейтрально.\n"
+        "Верни только одно слово из: интерес, отказ, негатив, бот, другое.")
+    try:
+        body = json.dumps({
+            "model": "openai/gpt-4o-mini",   # дёшево, для классификации хватает
+            "messages": [{"role": "system", "content": sysmsg},
+                         {"role": "user", "content": text[:500]}],
+            "temperature": 0,
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            API_URL, data=body,
+            headers={"Authorization": "Bearer " + cfg["key"],
+                     "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=cfg.get("timeout", 30)) as resp:
+            data = json.load(resp)
+        out = (data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip().lower()
+        for c in _CLASSES:
+            if c in out:
+                return c
+        return "другое"
+    except Exception as e:
+        print("classify_reply err:", type(e).__name__)
+        return "другое"
+
+
+def generate_followup(stage, base=""):
+    """Сгенерировать текст ДОБИВКИ (касание 2/3) для неответивших лидов.
+    Один текст на базу/стадию за прогон (followup.py его кэширует и рерайтит per-лид).
+    -> текст или "" при ошибке/выключенном ключе."""
+    cfg = _cfg()
+    if not cfg.get("key"):
+        return ""
+    bc = _read(BROADCAST)
+    role = ("касание №2: мягкое, ненавязчивое напоминание о себе"
+            if int(stage) == 2 else
+            "касание №3: финальное, в духе «если сейчас не актуально, просто скажите»")
+    sysmsg = (
+        "Ты менеджер ASCN, пишешь ДОБИВКУ в холодной Telegram-переписке лиду"
+        + (f" из сегмента «{base}»" if base and base != "default" else "")
+        + ", который не ответил на первое сообщение. "
+        f"Задача: {role}. 1-2 коротких предложения, на «вы», живо и по-человечески, "
+        "без длинных и коротких тире, без продающих штампов. Не повторяй дословно первое "
+        "сообщение, не представляйся заново, мягко веди на короткий созвон и закончи вопросом. "
+        "Верни ТОЛЬКО текст сообщения, без пояснений и кавычек.")
+    user = (f"Первое сообщение, на которое лид не ответил:\n{bc}"
+            if bc else "Первое сообщение было предложением автоматизации через ИИ-агентов ASCN.")
+    try:
+        body = json.dumps({
+            "model": cfg.get("model", "openai/gpt-4o"),
+            "messages": [{"role": "system", "content": sysmsg},
+                         {"role": "user", "content": user}],
+            "temperature": 0.8,
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            API_URL, data=body,
+            headers={"Authorization": "Bearer " + cfg["key"],
+                     "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=cfg.get("timeout", 45)) as resp:
+            data = json.load(resp)
+        out = (data.get("choices") or [{}])[0].get("message", {}).get("content", "").strip()
+        return C.strip_long_dashes(out) if out else ""
+    except Exception as e:
+        print("generate_followup err:", type(e).__name__)
+        return ""
+
+
 if __name__ == "__main__":
     import sys
-    a, n = (sys.argv[1], sys.argv[2]) if len(sys.argv) > 2 else ("", "")
-    txt, human, err = draft(a, n)
-    print("НУЖЕН ЧЕЛОВЕК:" if human else "черновик:", err or "")
-    print(txt)
+    if len(sys.argv) > 1 and sys.argv[1] == "followup":
+        st = sys.argv[2] if len(sys.argv) > 2 else "2"
+        bs = sys.argv[3] if len(sys.argv) > 3 else ""
+        print(generate_followup(st, bs))
+    else:
+        a, n = (sys.argv[1], sys.argv[2]) if len(sys.argv) > 2 else ("", "")
+        txt, human, err = draft(a, n)
+        print("НУЖЕН ЧЕЛОВЕК:" if human else "черновик:", err or "")
+        print(txt)

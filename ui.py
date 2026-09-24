@@ -781,18 +781,24 @@ STATS_TPL = _page("Статистика · ASCN Outreach", """
 </div>
 
 <div class="card">
-  <h3 style="margin:2px 0 10px">По базе</h3>
-  {% if camps %}
-  <table style="width:100%;border-collapse:collapse">
-    <tr class="hint"><th align="left">База</th><th align="right">Отправлено</th>
-      <th align="right">Ответов</th><th align="right">Отклик</th></tr>
-    {% for name,s,rr,rate in camps %}
+  <h3 style="margin:2px 0 10px">Воронка по базе</h3>
+  {% if funnel %}
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:560px">
+    <tr class="hint"><th align="left">База</th><th align="right">Отпр.</th><th align="right">Ответ.</th>
+      <th align="right">🔥 Интерес</th><th align="right">🙅 Отказ</th>
+      <th align="right">😠 Негатив</th><th align="right">🤖 Бот</th><th align="right">Интерес%</th></tr>
+    {% for name,s,rep,interes,otkaz,neg,bot in funnel %}
     <tr style="border-top:1px solid var(--color-border)">
-      <td style="padding:9px 0">{{ name }}</td>
-      <td align="right">{{ s }}</td><td align="right">{{ rr }}</td>
-      <td align="right"><b>{{ rate }}%</b></td></tr>
+      <td style="padding:8px 0">{{ name }}</td>
+      <td align="right">{{ s }}</td><td align="right">{{ rep }}</td>
+      <td align="right"><b style="color:var(--color-accent)">{{ interes }}</b></td>
+      <td align="right">{{ otkaz }}</td><td align="right">{{ neg }}</td><td align="right">{{ bot }}</td>
+      <td align="right"><b>{{ (100*interes/s)|round(1) if s else 0 }}%</b></td></tr>
     {% endfor %}
   </table>
+  </div>
+  <div class="hint" style="margin:10px 0 0">🔥 Интерес = реально тёплые (спросил цену, как работает, согласен). Оценивай это, а не «ответили» скопом.</div>
   {% else %}<div class="empty">Пока нет данных.</div>{% endif %}
 </div>
 
@@ -822,7 +828,7 @@ FOLLOWUPS_TPL = _page("Фоллоапы · ASCN Outreach", """
 <h1 class="page">🔁 Фоллоапы</h1>
 <div class="hint" style="margin:-6px 0 14px">
   Лид не ответил {{ day2 }} дн → касание №2, {{ day3 }} дн → касание №3. Тексты свои под каждую
-  базу (пусто = берётся «default»). Шлётся автоматически раз в день с того же аккаунта.
+  базу (пусто = ИИ напишет сам). Шлётся автоматически раз в день с того же аккаунта.
 </div>
 
 <div class="card">

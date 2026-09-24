@@ -25,6 +25,7 @@ import tg
 import campaign as C
 import spambot
 import alerts
+import ai_sales
 from errors_map import is_permanent
 
 LOG = "data/sent_log.csv"
@@ -62,12 +63,19 @@ def _basemap():
     return m
 
 
-def text_for(ft, base, stage):
+def _choose(ft, base, stage, cache):
+    """Текст касания. Приоритет: явный текст под базу -> ИИ сам пишет -> запасной default.
+    ИИ-текст генерится один раз на (база, стадия) за прогон и кэшируется."""
     s = str(stage)
-    t = ((ft.get(base) or {}).get(s) or "").strip()
-    if t:
-        return t
-    return ((ft.get(DEFAULT) or {}).get(s) or "").strip()
+    bt = ((ft.get(base) or {}).get(s) or "").strip()   # 1. вручную под базу
+    if bt:
+        return bt
+    ck = (base, stage)                                  # 2. ИИ сам
+    if ck not in cache:
+        cache[ck] = ai_sales.generate_followup(stage, base) or ""
+    if cache[ck]:
+        return cache[ck]
+    return ((ft.get(DEFAULT) or {}).get(s) or "").strip()  # 3. запасной
 
 
 def _days_ago(ts):
@@ -115,6 +123,7 @@ def main(dry=False):
     random.shuffle(order)
     sent = c2 = c3 = 0
     per_acc = {}
+    auto = {}   # кэш ИИ-текстов на прогон: (база, стадия) -> текст
 
     for nick, (acc, ts) in order:
         if sent >= MAX_PER_RUN:
@@ -133,14 +142,15 @@ def main(dry=False):
         text = newstage = None
 
         if stage == 0 and age >= DAY2:
-            t = text_for(ft, base, 2)
+            t = _choose(ft, base, 2, auto)
             if t:
                 text, newstage = t, 2
         elif stage == 2:
-            t = text_for(ft, base, 3)
             since_last = _days_ago(st.get("last", ts))
-            if t and age >= DAY3 and since_last >= (DAY3 - DAY2):
-                text, newstage = t, 3
+            if age >= DAY3 and since_last >= (DAY3 - DAY2):
+                t = _choose(ft, base, 3, auto)
+                if t:
+                    text, newstage = t, 3
         if not text:
             continue
 
@@ -149,7 +159,7 @@ def main(dry=False):
             c2 += newstage == 2
             c3 += newstage == 3
             per_acc[acc] = per_acc.get(acc, 0) + 1
-            print(f"[dry] {nick} [{base}] (акк {acc}, {age}д) -> касание №{newstage}")
+            print(f"[dry] {nick} [{base}] №{newstage}: {text[:70]}")
             continue
 
         msg = C.rewrite(text, broadcast=True)   # уникализация (если рерайт включён)

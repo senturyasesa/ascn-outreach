@@ -113,14 +113,42 @@ def per_base():
     return out
 
 
+def funnel():
+    """[(база, отправлено, ответили, интерес, отказ, негатив, бот)] по объёму.
+    Класс ответа берётся из replies.json[ник]['класс'] (тегает reply_intel.py)."""
+    order, m = _load_bases()
+    sent = defaultdict(int)
+    for nick, _ in _sent_ok():
+        sent[m.get(_key(nick), OTHER)] += 1
+    reps = _load_replies()
+    repcount = defaultdict(int)
+    cls = defaultdict(lambda: defaultdict(int))
+    for nick, info in reps.items():
+        base = m.get(_key(nick), OTHER)
+        repcount[base] += 1
+        k = info.get("класс", "другое") if isinstance(info, dict) else "другое"
+        cls[base][k] += 1
+    out = []
+    for n in order + [OTHER]:
+        s = sent.get(n, 0)
+        if not s:
+            continue
+        c = cls[n]
+        out.append((n, s, repcount.get(n, 0), c.get("интерес", 0),
+                    c.get("отказ", 0), c.get("негатив", 0), c.get("бот", 0)))
+    out.sort(key=lambda x: -x[1])
+    return out
+
+
 def summary_text():
     """Компактный блок для Telegram-отчёта."""
-    pb, pa = per_base(), per_account()
+    fn, pa = funnel(), per_account()
     m = ""
-    if pb:
-        m += "\n📇 Отклик по базе (за всё время):\n"
-        for name, s, rr, rate in pb:
-            m += f"  · {name}: {rate}% ({rr}/{s})\n"
+    if fn:
+        m += "\n📇 Воронка по базе (за всё время):\n"
+        for name, s, rep, interes, otkaz, neg, bot in fn:
+            rate = round(100 * interes / s, 1) if s else 0.0
+            m += f"  · {name}: {s} отпр, {rep} отв, 🔥{interes} интерес ({rate}%)\n"
     if pa:
         m += "\n👤 Отклик по акку (за всё время):\n"
         for acc, s, rr, rate in pa:

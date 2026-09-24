@@ -521,7 +521,7 @@ def followups_save():
 def stats_page():
     """Вкладка «Статистика»: reply-rate по тексту и по аккаунтам."""
     import stats as S
-    return render_template_string(STATS_TPL, camps=S.per_base(), accs=S.per_account())
+    return render_template_string(STATS_TPL, funnel=S.funnel(), accs=S.per_account())
 
 
 @app.route("/inbox")
