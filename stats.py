@@ -25,6 +25,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 LOG = "data/sent_log.csv"
 REPLIES = "data/replies.json"
 BASES = "data/bases.json"
+CLASSMAP = "data/reply_class.json"
 FOLLOWUPS = "data/followups.json"
 FTEXT = "data/followups_text.json"
 OTHER = "прочее"   # ник не найден ни в одной базе (ручные отправки и т.п.)
@@ -39,6 +40,15 @@ def _key(n):
 def _load_replies():
     try:
         return json.load(open(REPLIES, encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _classes():
+    """ник -> класс ответа (из отдельного файла, чтобы не затирался check.py)."""
+    try:
+        s = json.load(open(CLASSMAP, encoding="utf-8"))
+        return {k: (v.get("класс") if isinstance(v, dict) else v) for k, v in s.items()}
     except Exception:
         return {}
 
@@ -121,13 +131,13 @@ def funnel():
     for nick, _ in _sent_ok():
         sent[m.get(_key(nick), OTHER)] += 1
     reps = _load_replies()
+    classes = _classes()
     repcount = defaultdict(int)
     cls = defaultdict(lambda: defaultdict(int))
     for nick, info in reps.items():
         base = m.get(_key(nick), OTHER)
         repcount[base] += 1
-        k = info.get("класс", "другое") if isinstance(info, dict) else "другое"
-        cls[base][k] += 1
+        cls[base][classes.get(nick, "другое")] += 1
     out = []
     for n in order + [OTHER]:
         s = sent.get(n, 0)
