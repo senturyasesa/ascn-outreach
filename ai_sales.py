@@ -22,6 +22,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 CFG = "data/ai_sales.json"
 PROMPT = "data/ai_sales_prompt.txt"
 KB = "data/ai_sales_kb.md"
+BROADCAST = "data/broadcast.txt"
 REPLIES = "data/replies.json"
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 HUMAN_MARK = "[НУЖЕН ЧЕЛОВЕК]"
@@ -50,6 +51,11 @@ def _read(p):
 
 def _system():
     s = _read(PROMPT)
+    bc = _read(BROADCAST)
+    if bc:
+        s += ("\n\n=== НАШЕ ПЕРВОЕ (ХОЛОДНОЕ) СООБЩЕНИЕ, НА КОТОРОЕ ЛИД ОТВЕТИЛ ===\n"
+              "С этого началась переписка. Это то, что мы предложили человеку, "
+              "держи в голове контекст разговора:\n" + bc)
     kb = _read(KB)
     if kb:
         s += "\n\n=== БАЗА ЗНАНИЙ (факты, цены, тарифы, только отсюда) ===\n" + kb
