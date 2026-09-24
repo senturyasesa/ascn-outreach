@@ -785,16 +785,16 @@ STATS_TPL = _page("Статистика · ASCN Outreach", """
   {% if funnel %}
   <div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:560px">
-    <tr class="hint"><th align="left">База</th><th align="right">Отпр.</th><th align="right">Ответ.</th>
-      <th align="right">🔥 Интерес</th><th align="right">🙅 Отказ</th>
-      <th align="right">😠 Негатив</th><th align="right">🤖 Бот</th><th align="right">Интерес%</th></tr>
+    <tr class="hint"><th style="text-align:left">База</th><th style="text-align:right;white-space:nowrap">Отпр.</th><th style="text-align:right;white-space:nowrap">Ответ.</th>
+      <th style="text-align:right;white-space:nowrap">🔥 Интерес</th><th style="text-align:right;white-space:nowrap">🙅 Отказ</th>
+      <th style="text-align:right;white-space:nowrap">😠 Негатив</th><th style="text-align:right;white-space:nowrap">🤖 Бот</th><th style="text-align:right;white-space:nowrap">Интерес%</th></tr>
     {% for name,s,rep,interes,otkaz,neg,bot in funnel %}
     <tr style="border-top:1px solid var(--color-border)">
       <td style="padding:8px 0">{{ name }}</td>
-      <td align="right">{{ s }}</td><td align="right">{{ rep }}</td>
-      <td align="right"><b style="color:var(--color-accent)">{{ interes }}</b></td>
-      <td align="right">{{ otkaz }}</td><td align="right">{{ neg }}</td><td align="right">{{ bot }}</td>
-      <td align="right"><b>{{ (100*interes/s)|round(1) if s else 0 }}%</b></td></tr>
+      <td style="text-align:right;white-space:nowrap">{{ s }}</td><td style="text-align:right;white-space:nowrap">{{ rep }}</td>
+      <td style="text-align:right;white-space:nowrap"><b style="color:var(--color-accent)">{{ interes }}</b></td>
+      <td style="text-align:right;white-space:nowrap">{{ otkaz }}</td><td style="text-align:right;white-space:nowrap">{{ neg }}</td><td style="text-align:right;white-space:nowrap">{{ bot }}</td>
+      <td style="text-align:right;white-space:nowrap"><b>{{ (100*interes/s)|round(1) if s else 0 }}%</b></td></tr>
     {% endfor %}
   </table>
   </div>
@@ -806,13 +806,13 @@ STATS_TPL = _page("Статистика · ASCN Outreach", """
   <h3 style="margin:2px 0 10px">По аккаунту</h3>
   {% if accs %}
   <table style="width:100%;border-collapse:collapse">
-    <tr class="hint"><th align="left">Аккаунт</th><th align="right">Отправлено</th>
-      <th align="right">Ответов</th><th align="right">Отклик</th></tr>
+    <tr class="hint"><th style="text-align:left">Аккаунт</th><th style="text-align:right;white-space:nowrap">Отправлено</th>
+      <th style="text-align:right;white-space:nowrap">Ответов</th><th style="text-align:right;white-space:nowrap">Отклик</th></tr>
     {% for acc,s,rr,rate in accs %}
     <tr style="border-top:1px solid var(--color-border)">
       <td style="padding:9px 0">{{ acc }}</td>
-      <td align="right">{{ s }}</td><td align="right">{{ rr }}</td>
-      <td align="right"><b>{{ rate }}%</b></td></tr>
+      <td style="text-align:right;white-space:nowrap">{{ s }}</td><td style="text-align:right;white-space:nowrap">{{ rr }}</td>
+      <td style="text-align:right;white-space:nowrap"><b>{{ rate }}%</b></td></tr>
     {% endfor %}
   </table>
   {% else %}<div class="empty">Пока нет данных.</div>{% endif %}
@@ -836,15 +836,15 @@ FOLLOWUPS_TPL = _page("Фоллоапы · ASCN Outreach", """
   {% if rows %}
   <div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:14px;min-width:520px">
-    <tr class="hint"><th align="left">База</th><th align="right">Первое</th><th align="right">Ответили</th>
-      <th align="right">Ждут добивки</th><th align="right">№2</th><th align="right">№3</th>
-      <th align="right">Ответ после добивки</th></tr>
+    <tr class="hint"><th style="text-align:left">База</th><th style="text-align:right;white-space:nowrap">Первое</th><th style="text-align:right;white-space:nowrap">Ответили</th>
+      <th style="text-align:right;white-space:nowrap">Ждут добивки</th><th style="text-align:right;white-space:nowrap">№2</th><th style="text-align:right;white-space:nowrap">№3</th>
+      <th style="text-align:right;white-space:nowrap">Ответ после добивки</th></tr>
     {% for name,first,rep,due,s2,s3,after in rows %}
     <tr style="border-top:1px solid var(--color-border)">
       <td style="padding:8px 0">{{ name }}</td>
-      <td align="right">{{ first }}</td><td align="right">{{ rep }}</td>
-      <td align="right"><b>{{ due }}</b></td><td align="right">{{ s2 }}</td><td align="right">{{ s3 }}</td>
-      <td align="right"><b style="color:var(--color-accent)">{{ after }}</b></td></tr>
+      <td style="text-align:right;white-space:nowrap">{{ first }}</td><td style="text-align:right;white-space:nowrap">{{ rep }}</td>
+      <td style="text-align:right;white-space:nowrap"><b>{{ due }}</b></td><td style="text-align:right;white-space:nowrap">{{ s2 }}</td><td style="text-align:right;white-space:nowrap">{{ s3 }}</td>
+      <td style="text-align:right;white-space:nowrap"><b style="color:var(--color-accent)">{{ after }}</b></td></tr>
     {% endfor %}
   </table>
   </div>
