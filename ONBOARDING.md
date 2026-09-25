@@ -234,6 +234,26 @@ r = subprocess.run(["venv/bin/python", "one.py", "ИмяАкка"],
 
 ---
 
+## 6.1. Лид-движок (сбор баз)
+
+`lead_engine.py` заменяет три ручных парсера: находит чаты ниши, собирает тех, кто там
+пишет, проверяет профиль (bio, свой канал, бизнес-аккаунт, когда заходил, платные
+сообщения, «пишут только премиум»), отсеивает мусор и продавцов услуг и даёт ИИ-оценку
+«лпр / продавец / мусор» с баллом и причиной. Целевые выгружаются в `leads.xlsx` + `bases.json`.
+
+**Воркер — отдельный аккаунт, НЕ из рассылки.** Движок сам откажется работать с аккаунтом
+из `accounts.json`. Подключение: залогинь аккаунт в Telegram Desktop → tdata → `.session`
+(как в разделе 2) → положи в `data/` → **не** добавляй в `accounts.json` → назначь:
+```bash
+python3 lead_engine.py worker ИмяСессии
+python3 lead_engine.py niche "Онлайн-школы" --keywords "онлайн школы,инфобизнес" --icp "кого ищем" --target 150
+python3 lead_engine.py discover "Онлайн-школы"          # чаты с рейтингом -> data/engine/*_chats.json
+python3 lead_engine.py collect  "Онлайн-школы"          # лиды с оценкой  -> data/engine/*_leads.json
+python3 lead_engine.py export   "Онлайн-школы" инфобиз2 # целевые (лпр, балл ≥60) -> рассылка
+```
+Одна задача за раз (lock), прогресс — `data/engine/job.json`, откуда пришёл каждый лид —
+`data/lead_sources.json`. Пример конфига — `data/engine.example.json`.
+
 ## 7. Systemd — управление
 
 ```bash
