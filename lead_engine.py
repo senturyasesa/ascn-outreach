@@ -2,8 +2,8 @@
 """lead_engine.py — лид-движок: чаты ниши -> кто в них пишет -> проверка профиля ->
 фильтры -> ИИ-оценка -> выгрузка целевых в базу рассылки.
 
-Работает от ОТДЕЛЬНОГО воркер-аккаунта (data/engine.json: "worker"), который не
-участвует в рассылке. Одна задача за раз (lock). Прогресс — data/engine/job.json,
+Воркер задаётся в data/engine.json ("worker"). Может быть и рассылочным аккаунтом:
+движок работает с копией его сессии и не запускается, если аккаунт заморожен за флуд. Одна задача за раз (lock). Прогресс — data/engine/job.json,
 результаты — data/engine/<ниша>_chats.json и <ниша>_leads.json.
 
 Команды (вкладка сайта и агент вызывают то же самое):
@@ -28,8 +28,11 @@ from datetime import datetime, timezone, timedelta
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+import shutil
 import tg
 import ai_sales
+import campaign as C
+from telethon.sync import TelegramClient
 from telethon import errors, functions
 from telethon.tl.types import (User, UserStatusOnline, UserStatusOffline, UserStatusRecently,
                                UserStatusLastWeek, UserStatusLastMonth)
@@ -162,6 +165,15 @@ def acquire():
     return True
 
 
+def busy():
+    """Идёт ли сейчас задача (живой процесс держит lock)."""
+    try:
+        os.kill(int(open(LOCK).read().strip()), 0)
+        return True
+    except Exception:
+        return False
+
+
 def release():
     try:
         os.remove(LOCK)
@@ -226,17 +238,34 @@ def known_nicks():
 
 # ── Telegram ─────────────────────────────────────────────────────────────
 def open_worker():
+    """Воркер может быть и рассылочным аккаунтом. Чтобы не ловить «database is locked»
+    с демоном рассылки, работаем со СВОЕЙ копией сессии (тот же ключ, другой файл)."""
     w = cfg()["worker"].strip()
     if not w:
-        raise EngineError("воркер не назначен: python3 lead_engine.py worker <сессия>")
-    if w in set(_load("data/accounts.json", [])):
-        raise EngineError(f"«{w}» стоит в рассылке — воркер для парсинга должен быть отдельным")
-    if not os.path.exists(f"data/{w}.session"):
-        raise EngineError(f"нет файла сессии data/{w}.session")
-    cl = tg.open_clients([w], quiet=True)
-    if w not in cl:
-        raise EngineError(f"воркер «{w}» не открылся или не авторизован")
-    return cl[w]
+        raise EngineError("воркер не назначен")
+    src = f"data/{w}.session"
+    if not os.path.exists(src):
+        raise EngineError(f"нет файла сессии {src}")
+    try:
+        import spambot
+        if spambot.is_frozen(w):
+            raise EngineError(f"«{w}» заморожен за флуд — парсинг пропущен, чтобы не добить аккаунт")
+    except ImportError:
+        pass
+    os.makedirs("data/_engine", exist_ok=True)
+    dst = f"data/_engine/{w}"
+    for suf in (".session-journal", ".session-wal", ".session-shm"):
+        if os.path.exists(dst + suf):
+            os.remove(dst + suf)
+    shutil.copy2(src, dst + ".session")
+    api_id, api_hash = tg.credentials()
+    c = TelegramClient(dst, api_id, api_hash, proxy=tg.proxy_for(w),
+                       flood_sleep_threshold=60, **C.device_for(w))
+    c.connect()
+    if not c.is_user_authorized():
+        c.disconnect()
+        raise EngineError(f"воркер «{w}» не авторизован")
+    return c
 
 
 def call(fn, *a, **k):
@@ -281,12 +310,15 @@ def score_chat(c, ch, kw):
     score = (30 if idle <= 3 else 20 if idle <= 14 else 5 if idle <= 45 else 0)
     score += min(30, posters)
     score += 20 * (1 - spam_r) + 20 * (1 - sell_r)
+    note = ""
+    if idle > DAYS:        # сбор берёт только свежих авторов — из мёртвого чата будет ноль
+        score, note = min(score, 20), f"мёртвый: {idle} дн без сообщений"
     row.update(score=round(score), idle_days=idle, posters=posters,
-               spam_pct=round(100 * spam_r), sellers_pct=round(100 * sell_r), note="")
+               spam_pct=round(100 * spam_r), sellers_pct=round(100 * sell_r), note=note)
     return row
 
 
-def discover(niche):
+def discover(niche, max_chats=MAX_SAMPLE_CHATS):
     n = niche_cfg(niche)
     kws = [k.strip() for k in n.get("keywords", []) if k.strip()][:MAX_KEYWORDS]
     if not kws:
@@ -303,17 +335,18 @@ def discover(niche):
                     found.setdefault(ch.id, (ch, kw))
             time.sleep(SLEEP_SEARCH)
 
-        items = list(found.values())[:MAX_SAMPLE_CHATS]
+        items = list(found.values())[:max_chats]
         prev = {r["username"]: r for r in _load(chats_file(niche), [])}
         rows = []
         for i, (ch, kw) in enumerate(items, 1):
             job_set(stage=f"оценка чата: {ch.title}", progress=i, total=len(items))
             r = score_chat(c, ch, kw)
-            r["selected"] = prev.get(ch.username, {}).get("selected", r["score"] >= MIN_CHAT_SCORE)
+            r["selected"] = (False if r.get("idle_days", 0) > DAYS
+                             else prev.get(ch.username, {}).get("selected", r["score"] >= MIN_CHAT_SCORE))
             rows.append(r)
             time.sleep(SLEEP_SAMPLE)
     finally:
-        tg.close_clients({"w": c})
+        c.disconnect()
     rows.sort(key=lambda r: -r["score"])
     _save(chats_file(niche), rows)
     return {"найдено групп": len(found), "оценено": len(rows),
@@ -494,7 +527,7 @@ def collect(niche, chats=None):
             d["drop"] = drop_reason(d)
 
         alive = sorted((d for d in cand.values() if not d["drop"]), key=lambda d: -d["n"])
-        to_check = alive[:max(40, target * 2)]
+        to_check = alive[:max(20, target * 2)]
         profiles = _load(PROFILES, {})
         fresh = (_now() - timedelta(days=PROFILE_TTL_DAYS)).strftime("%Y-%m-%d")
         resolves = [0]
@@ -519,7 +552,7 @@ def collect(niche, chats=None):
         raise EngineError(f"Telegram притормозил воркер на {e.args[0]} сек. "
                           f"Собранное сохранено, запусти сбор позже.")
     finally:
-        tg.close_clients({"w": c})
+        c.disconnect()
 
     # ИИ-оценка — только тех, кто прошёл фильтры
     scored = [d for d in cand.values() if not d["drop"]]
@@ -628,6 +661,7 @@ def main():
     s = sub.add_parser("niche"); s.add_argument("name"); s.add_argument("--keywords", default="")
     s.add_argument("--icp", default=""); s.add_argument("--target", type=int, default=0)
     s = sub.add_parser("discover"); s.add_argument("niche")
+    s.add_argument("--max-chats", type=int, default=MAX_SAMPLE_CHATS)
     s = sub.add_parser("collect"); s.add_argument("niche"); s.add_argument("--chats", default="")
     s = sub.add_parser("export"); s.add_argument("niche"); s.add_argument("base")
     s.add_argument("--min", type=int, default=MIN_EXPORT_SCORE)
@@ -637,8 +671,6 @@ def main():
 
     if a.cmd == "worker":
         c = cfg()
-        if a.session in set(_load("data/accounts.json", [])):
-            print(f"«{a.session}» стоит в рассылке — выбери отдельный аккаунт"); return 1
         c["worker"] = a.session
         _save(CFG, c); print("воркер:", a.session); return 0
     if a.cmd == "niche":
@@ -654,7 +686,7 @@ def main():
     if a.cmd == "status":
         print(json.dumps(_load(JOB, {}), ensure_ascii=False, indent=1)); return 0
     if a.cmd == "discover":
-        return run("discover", a.niche, discover, a.niche)
+        return run("discover", a.niche, discover, a.niche, a.max_chats)
     if a.cmd == "collect":
         chats = [x for x in a.chats.split(",") if x.strip()] or None
         return run("collect", a.niche, collect, a.niche, chats)

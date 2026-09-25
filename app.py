@@ -28,7 +28,7 @@ import tg
 from errors_map import cell_text, is_permanent
 import vault as V
 import spambot
-from ui import INBOX_TPL, DIALOG_TPL, MAIN_TPL, SETTINGS_TPL, ONBOARD_TPL, CODE_TPL, UNLOCK_TPL, STATS_TPL, FOLLOWUPS_TPL
+from ui import INBOX_TPL, DIALOG_TPL, MAIN_TPL, SETTINGS_TPL, ONBOARD_TPL, CODE_TPL, UNLOCK_TPL, STATS_TPL, FOLLOWUPS_TPL, ENGINE_TPL
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -515,6 +515,161 @@ def followups_save():
     S.followups_text_save(d)
     flash("Тексты фоллоапов сохранены")
     return redirect(url_for("followups_page"))
+
+
+# ─── вкладка «Лиды»: лид-движок (lead_engine.py) ─────────────────────────
+ENGINE_KINDS = {"discover": "поиск чатов", "collect": "сбор лидов", "export": "выгрузка в рассылку"}
+_TG_NICK = re.compile(r"^[A-Za-z0-9_]{4,32}$")
+
+
+def _engine_back(niche=""):
+    return redirect(url_for("engine_page", n=niche))
+
+
+@app.route("/engine")
+def engine_page():
+    """Лид-движок: ниши, чаты с рейтингом, сбор и оценка лидов, выгрузка в рассылку."""
+    import lead_engine as LE
+    from collections import Counter
+    c = LE.cfg()
+    niches = list(c["niches"].keys())
+    cur = request.args.get("n")
+    if cur is None:
+        cur = niches[0] if niches else ""
+    if cur not in c["niches"]:
+        cur = ""
+    n = c["niches"].get(cur, {"keywords": [], "icp": "", "target": 150})
+    chats = LE._load(LE.chats_file(cur), []) if cur else []
+    leads = LE._load(LE.leads_file(cur), []) if cur else []
+
+    good = [d for d in leads if not d.get("drop") and d.get("class") == "лпр"
+            and (d.get("score") or 0) >= LE.MIN_EXPORT_SCORE]
+    f = request.args.get("f", "good" if good else "all")
+    shown = good if f == "good" else leads
+    shown = sorted(shown, key=lambda d: (bool(d.get("drop")), -(d.get("score") or 0)))[:300]
+
+    lstats = []
+    if leads:
+        drops = Counter(d["drop"] for d in leads if d.get("drop"))
+        cls = Counter(d.get("class") for d in leads if not d.get("drop") and d.get("class"))
+        lstats = [("кандидатов", len(leads)),
+                  ("🎯 целевых (лпр, ≥%d)" % LE.MIN_EXPORT_SCORE, len(good)),
+                  ("уже в рассылке", sum(1 for d in leads if d.get("exported"))),
+                  ("лпр / продавцы / мусор", "%d / %d / %d" % (cls.get("лпр", 0), cls.get("продавец", 0), cls.get("мусор", 0))),
+                  ("отсеяно фильтрами", ", ".join(f"{k} {v}" for k, v in drops.most_common()) or "0")]
+
+    job = LE._load(LE.JOB, {})
+    summ = []
+    for k, v in (job.get("summary") or {}).items():
+        if isinstance(v, dict):
+            v = ", ".join(f"{a}: {b}" for a, b in v.items()) or "—"
+        summ.append((k, v))
+    return render_template_string(
+        ENGINE_TPL, worker=c.get("worker"), niches=niches, cur=cur, n=n,
+        kw_text="\n".join(n.get("keywords", [])), chats=chats,
+        nsel=sum(1 for r in chats if r.get("selected")), leads=shown, f=f,
+        total_leads=len(leads), lstats=lstats,
+        ready=sum(1 for d in good if not d.get("exported")),
+        job=job, summ=summ, running=LE.busy(), kinds=ENGINE_KINDS)
+
+
+@app.route("/engine/niche", methods=["POST"])
+def engine_niche():
+    import lead_engine as LE
+    name = (request.form.get("name") or "").strip()[:60]
+    old = (request.form.get("old") or "").strip()
+    if not name:
+        flash("Нужно название ниши")
+        return _engine_back(old)
+    if LE.busy():
+        flash("Движок сейчас работает — сохрани нишу после окончания задачи")
+        return _engine_back(old)
+    kws = [k.strip() for k in re.split(r"[\n,]+", request.form.get("keywords", "")) if k.strip()]
+    icp = (request.form.get("icp") or "").strip()[:1500]
+    try:
+        target = max(10, min(1000, int(request.form.get("target") or 150)))
+    except ValueError:
+        target = 150
+    c = LE.cfg()
+    if old and old != name and old in c["niches"] and name not in c["niches"]:
+        c["niches"].pop(old)                       # переименование: переносим и найденное
+        for fn in (LE.chats_file, LE.leads_file):
+            if os.path.exists(fn(old)):
+                os.replace(fn(old), fn(name))
+    c["niches"][name] = {"keywords": kws[:LE.MAX_KEYWORDS], "icp": icp, "target": target}
+    LE._save(LE.CFG, c)
+    flash(f"Ниша «{name}» сохранена")
+    return _engine_back(name)
+
+
+@app.route("/engine/niche/delete", methods=["POST"])
+def engine_niche_delete():
+    import lead_engine as LE
+    name = (request.form.get("name") or "").strip()
+    if LE.busy():
+        flash("Движок сейчас работает — удалить можно после окончания задачи")
+        return _engine_back(name)
+    c = LE.cfg()
+    if c["niches"].pop(name, None) is not None:
+        LE._save(LE.CFG, c)
+        for fn in (LE.chats_file, LE.leads_file):
+            if os.path.exists(fn(name)):
+                os.remove(fn(name))
+        flash(f"Ниша «{name}» удалена")
+    return _engine_back("")
+
+
+@app.route("/engine/chats", methods=["POST"])
+def engine_chats():
+    import lead_engine as LE
+    niche = request.form.get("niche", "")
+    if niche not in LE.cfg()["niches"]:
+        return _engine_back("")
+    sel = set(request.form.getlist("sel"))
+    rows = LE._load(LE.chats_file(niche), [])
+    for r in rows:
+        r["selected"] = r["username"] in sel
+    add = (request.form.get("add") or "").strip().rstrip("/").split("/")[-1].lstrip("@")
+    if add:
+        if not _TG_NICK.match(add):
+            flash("Не похоже на @username чата")
+        elif add.lower() not in {r["username"].lower() for r in rows}:
+            rows.insert(0, {"username": add, "title": "", "members": 0, "score": 0,
+                            "note": "добавлен вручную", "selected": True})
+    LE._save(LE.chats_file(niche), rows)
+    flash("Выбор чатов сохранён")
+    return _engine_back(niche)
+
+
+@app.route("/engine/run", methods=["POST"])
+def engine_run():
+    import time
+    import lead_engine as LE
+    kind = request.form.get("kind", "")
+    niche = request.form.get("niche", "")
+    if kind not in ENGINE_KINDS or niche not in LE.cfg()["niches"]:
+        return _engine_back(niche)
+    if LE.busy():
+        flash("Движок уже занят задачей — дождись окончания")
+        return _engine_back(niche)
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    args = [sys.executable, "lead_engine.py", kind, niche]
+    if kind == "export":
+        base = (request.form.get("base") or niche).strip()[:60] or niche
+        try:
+            mn = max(0, min(100, int(request.form.get("min") or 60)))
+        except ValueError:
+            mn = 60
+        subprocess.run(args + [base, "--min", str(mn)], cwd=app_dir, capture_output=True, timeout=180)
+        job = LE._load(LE.JOB, {})
+        flash(job.get("error") or f"В базу «{base}» добавлено: {(job.get('summary') or {}).get('добавлено', 0)}")
+        return _engine_back(niche)
+    os.makedirs(os.path.join(app_dir, LE.DIR), exist_ok=True)
+    log = open(os.path.join(app_dir, LE.DIR, "last_run.log"), "w")
+    subprocess.Popen(args, cwd=app_dir, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    time.sleep(1.5)       # чтобы задача успела занять lock и показаться на странице
+    flash(f"Запустил: {ENGINE_KINDS[kind]}. Страница обновляется сама.")
+    return _engine_back(niche)
 
 
 @app.route("/stats")

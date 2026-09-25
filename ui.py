@@ -225,6 +225,7 @@ MAIN_TPL = _page("ASCN Outreach", """
   <a class="top-link" href="/inbox">💬 Ответы</a>
   <a class="top-link" href="/stats">📈 Статистика</a>
   <a class="top-link" href="/followups">🔁 Фоллоапы</a>
+  <a class="top-link" href="/engine">🧲 Лиды</a>
   <a class="top-link" href="/settings">⚙ Настройки</a>
 </header>
 
@@ -870,4 +871,174 @@ FOLLOWUPS_TPL = _page("Фоллоапы · ASCN Outreach", """
   {% endfor %}
   <button class="btn" type="submit">Сохранить тексты</button>
 </form>
+""")
+
+
+ENGINE_TPL = _page("Лиды · ASCN Outreach", """
+{% if running %}<meta http-equiv="refresh" content="6">{% endif %}
+<div class="topbar">
+  <a class="top-link" href="/">← К рассылке</a>
+  <a class="top-link" href="/stats">📈 Статистика</a>
+  <a class="top-link" href="/followups">🔁 Фоллоапы</a>
+</div>
+<h1 class="page">🧲 Лиды</h1>
+<div class="hint" style="margin:-6px 0 14px">
+  Движок находит чаты ниши, собирает тех, кто там пишет, проверяет профиль, отсеивает мусор
+  и продавцов услуг и оценивает каждого ИИ. Целевые одной кнопкой уходят в рассылку.
+  Воркер: <b>{{ worker or "не назначен" }}</b>.
+</div>
+
+{% if job %}
+<div class="card">
+  <h3 style="margin:2px 0 8px">{% if running %}⏳ Идёт: {% else %}Последняя задача: {% endif %}{{ kinds.get(job.kind, job.kind) }} · {{ job.niche }}</h3>
+  <div>{{ job.stage }}{% if job.total %} — {{ job.progress }} из {{ job.total }}{% endif %}</div>
+  {% if job.error %}<div class="empty" style="margin-top:8px">⚠️ {{ job.error }}</div>{% endif %}
+  {% if summ %}<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px">
+    {% for k, v in summ %}<div class="hint" style="margin:0">{{ k }}: <b>{{ v }}</b></div>{% endfor %}
+  </div>{% endif %}
+  <div class="hint" style="margin-top:6px">обновлено {{ job.updated }}{% if running %} · страница обновляется сама{% endif %}</div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3 style="margin:2px 0 10px">Ниша</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+    {% for name in niches %}<a class="pill {{ 'on' if name == cur }}" href="/engine?n={{ name|urlencode }}">{{ name }}</a>{% endfor %}
+    <a class="pill {{ 'on' if not cur }}" href="/engine?n=">＋ новая</a>
+  </div>
+  <form method="post" action="/engine/niche">
+    <input type="hidden" name="old" value="{{ cur }}">
+    <label class="field">Название</label>
+    <input name="name" value="{{ cur }}" required maxlength="60" placeholder="например: Онлайн-школы"
+           style="width:100%;box-sizing:border-box">
+    <label class="field" style="margin-top:10px;display:block">Ключевые слова для поиска чатов — каждое с новой строки</label>
+    <textarea name="keywords" rows="4" placeholder="онлайн школы&#10;инфобизнес&#10;продюсеры онлайн школ"
+      style="width:100%;box-sizing:border-box;font-family:inherit;font-size:inherit;padding:9px;resize:vertical">{{ kw_text }}</textarea>
+    <label class="field" style="margin-top:10px;display:block">Кого ищем — по этому описанию ИИ отбирает лидов</label>
+    <textarea name="icp" rows="3" placeholder="Владелец онлайн-школы или продюсер с потоком заявок. Не техспецы, не таргетологи, не те, кто сам продаёт ботов и ИИ."
+      style="width:100%;box-sizing:border-box;font-family:inherit;font-size:inherit;padding:9px;resize:vertical">{{ n.icp }}</textarea>
+    <label class="field" style="margin-top:10px;display:block">Сколько лидов нужно за один сбор</label>
+    <input name="target" type="number" min="10" max="1000" value="{{ n.target or 150 }}" style="width:120px">
+    <div style="margin-top:12px"><button class="btn" type="submit">Сохранить нишу</button></div>
+  </form>
+  {% if cur %}
+  <form method="post" action="/engine/niche/delete" style="margin-top:10px"
+        onsubmit="return confirm('Удалить нишу? Найденные по ней чаты и лиды тоже удалятся. В рассылке уже выгруженные лиды останутся.')">
+    <input type="hidden" name="name" value="{{ cur }}">
+    <button type="submit" style="background:none;border:none;color:var(--color-text-lighter);cursor:pointer;padding:0;font-family:inherit;text-decoration:underline">удалить нишу</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if cur %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+    <h3 style="margin:0">1. Чаты</h3>
+    <form method="post" action="/engine/run">
+      <input type="hidden" name="kind" value="discover"><input type="hidden" name="niche" value="{{ cur }}">
+      <button class="btn" type="submit" {% if running or not n.keywords %}disabled{% endif %}>🔎 Найти чаты</button>
+    </form>
+  </div>
+  {% if chats %}
+  <form method="post" action="/engine/chats">
+    <input type="hidden" name="niche" value="{{ cur }}">
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:660px">
+      <tr class="hint">
+        <th></th><th style="text-align:left">Чат</th>
+        <th style="text-align:right;white-space:nowrap">Участн.</th><th style="text-align:right;white-space:nowrap">Пишут</th>
+        <th style="text-align:right;white-space:nowrap">Тишина, дн</th><th style="text-align:right;white-space:nowrap">Спам</th>
+        <th style="text-align:right;white-space:nowrap">Продавцы</th><th style="text-align:right;white-space:nowrap">Рейтинг</th>
+      </tr>
+      {% for r in chats %}
+      <tr style="border-top:1px solid var(--color-border)">
+        <td style="padding:7px 6px 7px 0"><input type="checkbox" name="sel" value="{{ r.username }}" {% if r.selected %}checked{% endif %}></td>
+        <td style="padding:7px 4px">
+          <a href="https://t.me/{{ r.username }}" target="_blank" rel="noopener">{{ r.title or r.username }}</a>
+          <div class="hint" style="margin:0">@{{ r.username }}{% if r.note %} · {{ r.note }}{% endif %}</div>
+        </td>
+        <td style="text-align:right;white-space:nowrap">{{ r.members or "—" }}</td>
+        <td style="text-align:right;white-space:nowrap">{{ r.get("posters", "—") }}</td>
+        <td style="text-align:right;white-space:nowrap">{{ r.get("idle_days", "—") }}</td>
+        <td style="text-align:right;white-space:nowrap">{% if r.spam_pct is defined %}{{ r.spam_pct }}%{% else %}—{% endif %}</td>
+        <td style="text-align:right;white-space:nowrap">{% if r.sellers_pct is defined %}{{ r.sellers_pct }}%{% else %}—{% endif %}</td>
+        <td style="text-align:right;white-space:nowrap"><b>{{ r.score }}</b></td>
+      </tr>
+      {% endfor %}
+    </table>
+    </div>
+    <div class="hint" style="margin:8px 0 0">Рейтинг выше, если в чате пишут часто и много разных людей, а рекламы и продавцов услуг мало.
+      Отмечены рекомендованные — поправь галочки под себя.</div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+      <input name="add" placeholder="добавить свой чат: @username или ссылка t.me/…" style="flex:1;min-width:200px">
+      <button class="btn" type="submit">Сохранить выбор</button>
+    </div>
+  </form>
+  {% else %}
+  <div class="empty">Чатов пока нет. {% if n.keywords %}Нажми «Найти чаты».{% else %}Сначала впиши ключевые слова и сохрани нишу.{% endif %}</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+    <h3 style="margin:0">2. Сбор лидов</h3>
+    <form method="post" action="/engine/run">
+      <input type="hidden" name="kind" value="collect"><input type="hidden" name="niche" value="{{ cur }}">
+      <button class="btn" type="submit" {% if running or not nsel %}disabled{% endif %}>🧲 Собрать из отмеченных ({{ nsel }})</button>
+    </form>
+  </div>
+  {% if total_leads %}
+  <div style="display:flex;flex-wrap:wrap;gap:6px 18px;margin-bottom:10px">
+    {% for k, v in lstats %}<div>{{ k }}: <b>{{ v }}</b></div>{% endfor %}
+  </div>
+  <div class="hint" style="margin:0 0 8px">
+    Показаны: <b>{{ "целевые" if f == "good" else "все кандидаты" }}</b> ·
+    <a href="/engine?n={{ cur|urlencode }}&f=good">целевые</a> /
+    <a href="/engine?n={{ cur|urlencode }}&f=all">все, с причинами отсева</a>
+  </div>
+  {% if leads %}
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:720px">
+    <tr class="hint">
+      <th style="text-align:left">Лид</th><th style="text-align:left">Чат</th>
+      <th style="text-align:left">Класс</th><th style="text-align:right">Балл</th>
+      <th style="text-align:left">Почему</th>
+    </tr>
+    {% for d in leads %}
+    <tr style="border-top:1px solid var(--color-border);{% if d.drop %}opacity:.55{% endif %}">
+      <td style="padding:7px 4px">
+        <a href="https://t.me/{{ d.username }}" target="_blank" rel="noopener">@{{ d.username }}</a>
+        <div class="hint" style="margin:0">{{ d.name }}{% if d.exported %} · ✓ в рассылке{% endif %}</div>
+      </td>
+      <td style="padding:7px 4px;white-space:nowrap">{{ d.chat }}</td>
+      <td style="padding:7px 4px;white-space:nowrap">{% if d.drop %}отсеян{% else %}{{ d.get("class", "—") }}{% endif %}</td>
+      <td style="text-align:right;white-space:nowrap"><b>{{ d.get("score", "") if not d.drop else "" }}</b></td>
+      <td style="padding:7px 4px">
+        {% if d.drop %}{{ d.drop }}{% else %}{{ d.get("reason", "") }}{% endif %}
+        {% if d.bio %}<div class="hint" style="margin:2px 0 0">bio: {{ d.bio[:140] }}</div>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% else %}
+  <div class="empty">В этом фильтре пусто.</div>
+  {% endif %}
+  {% else %}
+  <div class="empty">Лидов пока нет. Отметь чаты и нажми «Собрать».</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3 style="margin:2px 0 10px">3. В рассылку</h3>
+  <form method="post" action="/engine/run" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <input type="hidden" name="kind" value="export"><input type="hidden" name="niche" value="{{ cur }}">
+    <div><label class="field">В какую базу</label><input name="base" value="{{ cur }}" required maxlength="60"></div>
+    <div><label class="field">Мин. балл</label><input name="min" type="number" min="0" max="100" value="60" style="width:90px"></div>
+    <button class="btn" type="submit" {% if running or not ready %}disabled{% endif %}>➕ Добавить в рассылку ({{ ready }} с баллом ≥60)</button>
+  </form>
+  <div class="hint" style="margin:10px 0 0">Уходят только «лпр» с баллом не ниже порога и без тех, кому уже писали.
+    База сразу появится в «Статистике» и «Фоллоапах», текст — единый для базы.</div>
+</div>
+{% endif %}
 """)
