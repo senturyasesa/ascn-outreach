@@ -64,12 +64,16 @@ cat <<MSG
                            (образцы: *.example.txt / *.example.md; ключ OpenRouter из rewrite.json)
 
 Затем включи сервисы:
-  sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer ascn-bot ascn-followup.timer
+  sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer ascn-bot ascn-api
 
 Проверка:
   systemctl status ascn-outreach
   дашборд → http://<IP-сервера>:8765
 
-  Если дашборд недоступен снаружи — открой порт:
-    sudo ufw allow 8765/tcp    (или проверь firewall провайдера)
+  Порты: дашборд 8765 открывай ТОЛЬКО своему IP (у него нет полноценной авторизации),
+  API для агента 8766 — всем (каждый метод по токену):
+    sudo ufw allow 22/tcp
+    sudo ufw allow from <ТВОЙ_IP> to any port 8765 proto tcp
+    sudo ufw allow 8766/tcp
+    sudo ufw --force enable
 MSG

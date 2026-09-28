@@ -91,6 +91,44 @@ def thaw_expired():
         save_freeze(d)
 
 
+# ─────────────── отдых после флуда (не зависит от вердикта @SpamBot) ───────────────
+REST = "data/rest.json"
+
+
+def _load_rest():
+    try:
+        return json.load(open(REST, encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def rest_account(acc, seconds=None, reason=""):
+    """Убрать аккаунт из рассылки: на seconds, либо до 09:00 МСК следующего дня.
+    Нужно потому, что @SpamBot часто пишет «лимитов нет», а PeerFlood остаётся —
+    без отдыха демон долбит аккаунт каждые 10 минут и углубляет ограничение."""
+    now = datetime.now(timezone.utc)
+    if seconds:
+        until = now + timedelta(seconds=int(seconds) + 60)
+    else:
+        until = now.replace(hour=6, minute=0, second=0, microsecond=0)   # 09:00 МСК
+        if until <= now:
+            until += timedelta(days=1)
+    d = _load_rest()
+    d[acc] = {"until": until.isoformat(), "reason": reason[:200]}
+    json.dump(d, open(REST, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    return until
+
+
+def is_resting(acc):
+    e = _load_rest().get(acc)
+    if not e:
+        return False
+    try:
+        return datetime.now(timezone.utc) < datetime.fromisoformat(e["until"])
+    except Exception:
+        return False
+
+
 # ─────────────── очередь на проверку ───────────────
 def enqueue(acc):
     try:

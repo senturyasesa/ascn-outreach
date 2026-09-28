@@ -166,7 +166,7 @@ def all_accounts():
         bl = set(json.load(open("data/blacklist.json", encoding="utf-8")).keys())
     except Exception:
         bl = set()
-    return [a for a in accs if a not in bl and not spambot.is_frozen(a)]
+    return [a for a in accs if a not in bl and not spambot.is_frozen(a) and not spambot.is_resting(a)]
 
 
 def manual_running():
@@ -295,6 +295,10 @@ def send_one(acc, lead, bc):
         if alerts.is_flood(e):
             alerts.alert_flood(acc, e)
             spambot.enqueue(acc)
+            secs = getattr(e, "seconds", None)            # FloodWait — ровно сколько просят
+            until = spambot.rest_account(acc, secs, f"{type(e).__name__}: {e}"[:200])
+            alerts.alert(f"😴 {acc} отдыхает до {(until + timedelta(hours=3)).strftime('%d.%m %H:%M')} МСК "
+                         f"— в рассылку не берётся, чтобы не добивать аккаунт.")
     finally:
         signal.alarm(0)
 
@@ -330,6 +334,14 @@ def _log_text(nick, acc, ts, text, choices):
 
 def daemon():
     print("daily_sender: демон запущен, окно %02d-%02d МСК" % (WIN_START, WIN_END))
+    # при старте чистим зависшие SQLite-журналы (остаются от прибитых процессов
+    # и вешают сессию на "database is locked" — как было с Alex)
+    import glob as _g
+    for _j in _g.glob("data/*.session-journal"):
+        try:
+            os.remove(_j); print("  очищен зависший journal:", _j)
+        except Exception:
+            pass
     while True:
         target, active = load_plan()
         if not active or target <= 0:

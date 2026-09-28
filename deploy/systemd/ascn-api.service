@@ -1,0 +1,13 @@
+[Unit]
+Description=ASCN — REST API для агента (отдельный порт, только по токену)
+After=network.target
+[Service]
+Type=simple
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=-__APP_DIR__/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=__APP_DIR__/venv/bin/python api_server.py
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target

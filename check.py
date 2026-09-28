@@ -94,7 +94,7 @@ def check_leads(sessions):
         print("Проверять нечего: все ники уже проверены или им уже писали.")
         return
 
-    clients = tg.open_clients(sessions)
+    clients = tg.open_copies(sessions, "_check", quiet=False)
     if not clients:
         print("Нет ни одного рабочего аккаунта — проверять нечем.")
         return
@@ -131,7 +131,7 @@ def check_replies(sessions):
         print("Ещё некому было отвечать: рассылка пока ничего не отправила.")
         return
 
-    clients = tg.open_clients(sessions)
+    clients = tg.open_copies(sessions, "_check", quiet=False)
     if not clients:
         print("Нет ни одного рабочего аккаунта.")
         return

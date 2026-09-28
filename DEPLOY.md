@@ -15,6 +15,7 @@ api-ключи, прокси, база, текст) заполняются вр�
   НЕ открывай порт всему интернету. Ограничь его своим IP:
   `sudo ufw allow 22/tcp && sudo ufw allow from <ТВОЙ_IP> to any port 8765 proto tcp && sudo ufw --force enable`
   (SSH на 22 разреши ПЕРВЫМ, иначе потеряешь доступ). Свой текущий IP на сервере: `echo $SSH_CLIENT`.
+  API для агента живёт отдельно на **8766** (`api_server.py`, только /api/*, всё по токену): `sudo ufw allow 8766/tcp`.
 
 ## Быстрый старт
 
@@ -57,7 +58,7 @@ sudo ./deploy/deploy.sh
 После заполнения данных:
 
 ```bash
-sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer ascn-bot ascn-followup.timer
+sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-report.timer ascn-bot ascn-api
 ```
 
 | Сервис | Что делает |
@@ -67,7 +68,8 @@ sudo systemctl enable --now ascn-outreach ascn-daily ascn-notify.timer ascn-repo
 | `ascn-notify.timer` | проверка ответов каждые 15 мин |
 | `ascn-report.timer` | почасовые отчёты в бота (09-21 МСК) |
 | `ascn-bot` | слушатель кнопок черновиков ИИ-продажника в боте |
-| `ascn-followup.timer` | авто-фоллоапы неответившим лидам (раз в день) |
+| `ascn-api` | REST API для агента на порту **8766** (открыт наружу, каждый метод по токену) |
+| `ascn-followup.timer` | ⚠️ ВЫКЛЮЧЕН: добивки молчунам ловят PeerFlood, не включать |
 
 Дашборд: `http://<IP-сервера>:8765`
 

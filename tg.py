@@ -79,6 +79,37 @@ def open_clients(names, quiet=False):
     return clients
 
 
+def open_copies(names, subdir="_check", quiet=True):
+    """Открыть аккаунты с КОПИЙ сессий (data/<subdir>/). Для долгих фоновых задач
+    (проверка ответов): они не держат оригиналы, и демон рассылки не ловит
+    «database is locked». Ключ тот же — Telegram спокойно держит второй коннект."""
+    api_id, api_hash = credentials()
+    d = os.path.join(SESS_DIR, subdir)
+    os.makedirs(d, exist_ok=True)
+    clients = {}
+    for s in names:
+        src = os.path.join(SESS_DIR, s + ".session")
+        if not os.path.exists(src):
+            continue
+        dst = os.path.join(d, s)
+        try:
+            for suf in (".session-journal", ".session-wal", ".session-shm"):
+                if os.path.exists(dst + suf):
+                    os.remove(dst + suf)
+            shutil.copy2(src, dst + ".session")
+            c = TelegramClient(dst, api_id, api_hash, proxy=proxy_for(s),
+                               flood_sleep_threshold=60, **C.device_for(s))
+            c.connect()
+            if c.is_user_authorized():
+                clients[s] = c
+            else:
+                c.disconnect()
+        except Exception as e:
+            if not quiet:
+                print(f"  аккаунт {s}: копия не открылась ({e}), пропускаю")
+    return clients
+
+
 def close_clients(clients):
     for c in (clients or {}).values():
         try:
